@@ -32,7 +32,7 @@ export function SearchAndFilters() {
       params.delete("q")
     }
 
-    params.delete("page") // Reset to first page when searching
+    params.delete("page")
     router.push(`?${params.toString()}`)
   }, [debouncedSearchQuery, router, searchParams])
 
@@ -45,7 +45,7 @@ export function SearchAndFilters() {
       params.set(key, value)
     }
 
-    params.delete("page") // Reset to first page when filtering
+    params.delete("page") 
     router.push(`?${params.toString()}`)
   }
 

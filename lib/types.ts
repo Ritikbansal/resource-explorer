@@ -6,7 +6,6 @@ export interface Item {
   status: "active" | "inactive" | "pending"
   createdAt: string
   imageUrl?: string
-  // Pokemon-specific fields
   height?: number
   weight?: number
   types?: string[]
@@ -26,7 +25,7 @@ export interface SearchParams {
   sort?: "name" | "date" | "category"
   order?: "asc" | "desc"
   page?: number
-  favorites?: boolean // Added favorites filter parameter
+  favorites?: boolean
 }
 
 export interface PaginatedResponse<T> {

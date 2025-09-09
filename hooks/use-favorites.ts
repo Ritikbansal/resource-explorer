@@ -21,7 +21,6 @@ export function useFavorites() {
   }, [])
 
   const toggleFavorite = (itemId: string) => {
-    // Optimistically update the UI immediately
     const currentFavorites = [...favorites]
     const isCurrentlyFavorite = currentFavorites.includes(itemId)
 
@@ -31,7 +30,6 @@ export function useFavorites() {
       setFavorites([...currentFavorites, itemId])
     }
 
-    // Then perform the actual operation
     const newIsFavorite = FavoritesManager.toggleFavorite(itemId)
     return newIsFavorite
   }
