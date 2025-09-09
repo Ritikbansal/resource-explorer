@@ -30,33 +30,25 @@ A modern React/Next.js application that lets users explore Pokemon data from the
 ### Installation
 
 1. Clone the repository:
-\`\`\`bash
 git clone https://github.com/Ritikbansal/resource-explorer.git
 cd resource-explorer
-\`\`\`
 
 2. Install dependencies:
-\`\`\`bash
 npm install
 # or
 yarn install
-\`\`\`
 
 3. Run the development server:
-\`\`\`bash
 npm run dev
 # or
 yarn dev
-\`\`\`
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Build for Production
 
-\`\`\`bash
 npm run build
 npm start
-\`\`\`
 
 ## 🏗️ Architecture & Trade-offs
 
@@ -123,34 +115,6 @@ If I had more time, here's what I would prioritize:
 - **Virtualization** becomes critical as the dataset grows beyond the current ~1000 Pokemon
 - **Advanced filtering** addresses the most common user need for finding specific Pokemon
 - **Code splitting** improves initial load time, which affects user retention
-
-## 📁 Project Structure
-
-\`\`\`
-├── app/                    # Next.js App Router pages
-│   ├── favorites/         # Favorites page
-│   ├── items/[id]/       # Dynamic Pokemon detail pages
-│   ├── layout.tsx        # Root layout with providers
-│   └── page.tsx          # Home page with Pokemon list
-├── components/           # Reusable UI components
-│   ├── ui/              # shadcn/ui base components
-│   ├── error-boundary.tsx
-│   ├── item-card.tsx
-│   ├── item-detail.tsx
-│   ├── navigation.tsx
-│   ├── pagination.tsx
-│   ├── search-and-filters.tsx
-│   └── theme-toggle.tsx
-├── hooks/               # Custom React hooks
-│   ├── use-debounce.ts
-│   └── use-favorites.ts
-├── lib/                # Utility functions and data layer
-│   ├── data.ts         # API functions and Pokemon data fetching
-│   ├── favorites.ts    # Favorites management utilities
-│   ├── types.ts        # TypeScript type definitions
-│   └── utils.ts        # General utility functions
-└── public/             # Static assets
-\`\`\`
 
 ## 🤝 Contributing
 
