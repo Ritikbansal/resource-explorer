@@ -1,21 +1,70 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Search, Filter, SortAsc, SortDesc, X, Heart } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { categories, statuses } from "@/lib/data"
-import { useDebounce } from "@/hooks/use-debounce"
+
+// Custom debounce hook with AbortController
+function useDebounceWithAbort<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): [T, () => void] {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const debouncedCallback = useCallback(((...args: Parameters<T>) => {
+    // Clear previous timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+
+    // Abort previous operation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    // Set new timeout
+    timeoutRef.current = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        callback(...args)
+      }
+    }, delay)
+  }) as T, [callback, delay])
+
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cancel()
+    }
+  }, [cancel])
+
+  return [debouncedCallback, cancel]
+}
 
 export function SearchAndFilters() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const isInitialMount = useRef(true)
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
-  const debouncedSearchQuery = useDebounce(searchQuery, 500)
 
   const currentCategory = searchParams.get("category") || "all"
   const currentStatus = searchParams.get("status") || "all"
@@ -23,20 +72,42 @@ export function SearchAndFilters() {
   const currentOrder = searchParams.get("order") || "asc"
   const showFavorites = searchParams.get("favorites") === "true"
 
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams)
+  // Debounced search handler with AbortController
+  const handleDebouncedSearch = useCallback((query: string) => {
+    const currentQuery = searchParams.get("q") || ""
+    if (query !== currentQuery) {
+      const params = new URLSearchParams(searchParams)
 
-    if (debouncedSearchQuery) {
-      params.set("q", debouncedSearchQuery)
-    } else {
-      params.delete("q")
+      if (query) {
+        params.set("q", query)
+      } else {
+        params.delete("q")
+      }
+
+      params.delete("page")
+      router.push(`?${params.toString()}`)
+    }
+  }, [searchParams, router])
+
+  const [debouncedSearchHandler, cancelSearch] = useDebounceWithAbort(
+    handleDebouncedSearch,
+    500
+  )
+
+  useEffect(() => {
+    // Skip the effect on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
     }
 
-    params.delete("page")
-    router.push(`?${params.toString()}`)
-  }, [debouncedSearchQuery, router, searchParams])
+    debouncedSearchHandler(searchQuery)
+  }, [searchQuery, debouncedSearchHandler])
 
   const updateFilter = (key: string, value: string) => {
+    // Cancel any pending search operations
+    cancelSearch()
+    
     const params = new URLSearchParams(searchParams)
 
     if (value === "all") {
@@ -50,6 +121,8 @@ export function SearchAndFilters() {
   }
 
   const toggleSortOrder = () => {
+    cancelSearch()
+    
     const params = new URLSearchParams(searchParams)
     const newOrder = currentOrder === "asc" ? "desc" : "asc"
     params.set("order", newOrder)
@@ -58,6 +131,8 @@ export function SearchAndFilters() {
   }
 
   const toggleFavorites = () => {
+    cancelSearch()
+    
     const params = new URLSearchParams(searchParams)
     if (showFavorites) {
       params.delete("favorites")
@@ -69,6 +144,8 @@ export function SearchAndFilters() {
   }
 
   const clearAllFilters = () => {
+    cancelSearch()
+    
     const params = new URLSearchParams()
     router.push(`?${params.toString()}`)
     setSearchQuery("")
@@ -91,7 +168,10 @@ export function SearchAndFilters() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSearchQuery("")}
+              onClick={() => {
+                cancelSearch()
+                setSearchQuery("")
+              }}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
             >
               <X className="h-3 w-3" />
@@ -176,7 +256,10 @@ export function SearchAndFilters() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  cancelSearch()
+                  setSearchQuery("")
+                }}
                 className="ml-1 h-4 w-4 p-0 hover:bg-accent/20"
               >
                 <X className="h-3 w-3" />

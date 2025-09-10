@@ -1,0 +1,103 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Pokemon {
+    id                 Int     @id
+    name               String  @unique
+    height             Int?
+    weight             Int?
+    baseExperience     Int?    @map("base_experience")
+    spriteUrl          String? @map("sprite_url")
+    spriteObjectKey    String? @map("sprite_object_key")
+    officialArtworkUrl String? @map("official_artwork_url")
+
+    // Stats
+    hp             Int @default(0)
+    attack         Int @default(0)
+    defense        Int @default(0)
+    speed          Int @default(0)
+    specialAttack  Int @default(0) @map("special_attack")
+    specialDefense Int @default(0) @map("special_defense")
+    totalStats     Int @default(0) @map("total_stats")
+
+    // Timestamps
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    // Relations
+    types     PokemonType[]
+    abilities PokemonAbility[]
+
+    @@map("pokemon")
+}
+
+model Type {
+    id   Int    @id
+    name String @unique
+
+    // Timestamps
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    // Relations
+    pokemon PokemonType[]
+
+    @@map("type")
+}
+
+model PokemonType {
+    pokemonId Int @map("pokemon_id")
+    typeId    Int @map("type_id")
+    slot      Int @default(1)
+
+    // Timestamps
+    createdAt DateTime @default(now()) @map("created_at")
+
+    // Relations
+    pokemon Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+    type    Type    @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+    @@id([pokemonId, typeId])
+    @@map("pokemon_type")
+}
+
+model PokemonAbility {
+    pokemonId   Int     @map("pokemon_id")
+    abilityId   Int     @map("ability_id")
+    abilityName String  @map("ability_name")
+    slot        Int
+    isHidden    Boolean @default(false) @map("is_hidden")
+
+    // Timestamps
+    createdAt DateTime @default(now()) @map("created_at")
+
+    // Relations
+    pokemon Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+
+    @@id([pokemonId, abilityId])
+    @@map("pokemon_ability")
+}
+
+model PokemonSpecies {
+    id            Int     @id
+    name          String  @unique
+    baseHappiness Int?    @map("base_happiness")
+    captureRate   Int?    @map("capture_rate")
+    color         String?
+    habitat       String?
+    isLegendary   Boolean @default(false) @map("is_legendary")
+    isMythical    Boolean @default(false) @map("is_mythical")
+    flavorTextEn  String? @map("flavor_text_en")
+
+    // Timestamps
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("pokemon_species")
+}

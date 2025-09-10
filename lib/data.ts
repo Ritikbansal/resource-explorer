@@ -2,9 +2,6 @@ import type {
   Item,
   PaginatedResponse,
   SearchParams,
-  PokemonApiResponse,
-  PokemonSpeciesResponse,
-  PokemonListResponse,
 } from "./types"
 import { FavoritesManager } from "./favorites"
 
@@ -25,25 +22,11 @@ export class NetworkError extends Error {
   }
 }
 
-const POKEMON_API_BASE = "https://pokeapi.co/api/v2"
+const API_BASE = "/api"
 const ITEMS_PER_PAGE = 20
 
-async function pokemonToItem(pokemon: PokemonApiResponse): Promise<Item> {
-  let description = `A ${pokemon.types.map((t) => t.type.name).join("/")} type Pokemon.`
-
-  try {
-    const speciesResponse = await fetch(pokemon.species.url)
-    if (speciesResponse.ok) {
-      const speciesData: PokemonSpeciesResponse = await speciesResponse.json()
-      const englishEntry = speciesData.flavor_text_entries.find((entry) => entry.language.name === "en")
-      if (englishEntry) {
-        description = englishEntry.flavor_text.replace(/\f/g, " ").replace(/\n/g, " ")
-      }
-    }
-  } catch (error) {
-    console.warn("Failed to fetch species data for", pokemon.name)
-  }
-
+// Convert Pokemon from your database to Item format
+function pokemonToItem(pokemon: any): Item {
   const primaryType = pokemon.types[0]?.type.name || "normal"
   const typeCategories: Record<string, string> = {
     fire: "Fire",
@@ -66,11 +49,18 @@ async function pokemonToItem(pokemon: PokemonApiResponse): Promise<Item> {
     normal: "Normal",
   }
 
-  const totalStats = pokemon.stats.reduce((sum, stat) => sum + stat.base_stat, 0)
   let status: "active" | "inactive" | "pending" = "active"
-  if (totalStats > 600)
+  if (pokemon.totalStats > 600) {
     status = "pending" // Legendary-tier
-  else if (totalStats < 300) status = "inactive" // Weak Pokemon
+  } else if (pokemon.totalStats < 300) {
+    status = "inactive" // Weak Pokemon
+  }
+
+  // Get description from species or default
+  let description = `A ${pokemon.types.map((t: any) => t.type.name).join("/")} type Pokemon.`
+  if (pokemon.species?.flavorTextEn) {
+    description = pokemon.species.flavorTextEn
+  }
 
   return {
     id: pokemon.id.toString(),
@@ -78,104 +68,115 @@ async function pokemonToItem(pokemon: PokemonApiResponse): Promise<Item> {
     description,
     category: typeCategories[primaryType] || "Normal",
     status,
-    createdAt: new Date(Date.now() - pokemon.id * 86400000).toISOString(),
-    imageUrl: pokemon.sprites.other["official-artwork"].front_default || pokemon.sprites.front_default || '#',
-    height: pokemon.height,
-    weight: pokemon.weight,
-    types: pokemon.types.map((t) => t.type.name),
-    abilities: pokemon.abilities.map((a) => a.ability.name),
+    createdAt: pokemon.createdAt || new Date().toISOString(),
+    imageUrl: pokemon.officialArtworkUrl || pokemon.spriteUrl || "#", // Fixed: Added closing quote
+    height: pokemon.height || 0,
+    weight: pokemon.weight || 0,
+    types: pokemon.types.map((t: any) => t.type.name),
+    abilities: pokemon.abilities.map((a: any) => a.abilityName),
     stats: {
-      hp: pokemon.stats.find((s) => s.stat.name === "hp")?.base_stat || 0,
-      attack: pokemon.stats.find((s) => s.stat.name === "attack")?.base_stat || 0,
-      defense: pokemon.stats.find((s) => s.stat.name === "defense")?.base_stat || 0,
-      speed: pokemon.stats.find((s) => s.stat.name === "speed")?.base_stat || 0,
+      hp: pokemon.hp || 0,
+      attack: pokemon.attack || 0,
+      defense: pokemon.defense || 0,
+      speed: pokemon.speed || 0,
     },
   }
 }
 
-export async function fetchItems(params: SearchParams = {}): Promise<PaginatedResponse<Item>> {
+export async function fetchItems(params: SearchParams = {}, signal?: AbortSignal): Promise<PaginatedResponse<Item>> {
   try {
-    const page = params.page || 1
-    const offset = (page - 1) * ITEMS_PER_PAGE
-
-    const listResponse = await fetch(`${POKEMON_API_BASE}/pokemon?limit=${ITEMS_PER_PAGE}&offset=${offset}`)
-    if (!listResponse.ok) {
-      throw new NetworkError("Failed to connect to Pokemon API")
+    // Build query parameters
+    const searchParams = new URLSearchParams()
+    
+    if (params.page) {
+      searchParams.set('page', params.page.toString())
+    }
+    
+    searchParams.set('limit', ITEMS_PER_PAGE.toString())
+    
+    if (params.q && params.q.trim()) {
+      searchParams.set('search', params.q.trim())
+    }
+    
+    if (params.category && params.category !== "all") {
+      const typeMap: Record<string, string> = {
+        "Fire": "fire", "Water": "water", "Grass": "grass",
+        "Electric": "electric", "Psychic": "psychic", "Ice": "ice",
+        "Dragon": "dragon", "Dark": "dark", "Fairy": "fairy",
+        "Fighting": "fighting", "Poison": "poison", "Ground": "ground",
+        "Flying": "flying", "Bug": "bug", "Rock": "rock",
+        "Ghost": "ghost", "Steel": "steel", "Normal": "normal",
+      }
+      const typeName = typeMap[params.category] || params.category.toLowerCase()
+      searchParams.set('type', typeName)
+    }
+    
+    if (params.sort) {
+      const sortMap: Record<string, string> = {
+        "name": "name",
+        "date": "createdAt", 
+        "category": "name",
+      }
+      searchParams.set('sortBy', sortMap[params.sort] || 'name')
+    }
+    
+    if (params.order) {
+      searchParams.set('sortOrder', params.order)
     }
 
-    const listData: PokemonListResponse = await listResponse.json()
-
-    const pokemonPromises = listData.results.map(async (pokemon) => {
-      const response = await fetch(pokemon.url)
-      if (!response.ok) throw new Error(`Failed to fetch ${pokemon.name}`)
-      const pokemonData: PokemonApiResponse = await response.json()
-      return pokemonToItem(pokemonData)
+    const url = `http://localhost:3000/api/pokemon?${searchParams.toString()}`
+    console.log('🌐 Fetching from URL:', url)
+    
+    // Pass AbortSignal to fetch
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal // Add AbortSignal here
     })
-
-    let items = await Promise.all(pokemonPromises)
-
+    
+    if (!response.ok) {
+      console.error('❌ API Response:', response.status, response.statusText)
+      throw new NetworkError(`API returned ${response.status}: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    console.log('✅ API Response received:', { 
+      page: data.pagination?.page, 
+      total: data.pagination?.total,
+      itemCount: data.data?.length 
+    })
+    
+    // Convert Pokemon to Items
+    let items = data.data.map(pokemonToItem)
+    
+    // Apply client-side filters
     if (params.favorites) {
       try {
         const favoriteIds = FavoritesManager.getFavorites()
         items = items.filter((item) => favoriteIds.includes(item.id))
       } catch (error) {
-        console.warn("Failed to load favorites from localStorage:", error)
+        console.warn("Failed to load favorites:", error)
       }
     }
-
-    if (params.q) {
-      const query = params.q.toLowerCase()
-      items = items.filter(
-        (item) =>
-          item.name.toLowerCase().includes(query) ||
-          item.description.toLowerCase().includes(query) ||
-          item.types?.some((type) => type.toLowerCase().includes(query)),
-      )
-    }
-
-    if (params.category && params.category !== "all") {
-      items = items.filter((item) => item.category === params.category)
-    }
-
+    
     if (params.status && params.status !== "all") {
       items = items.filter((item) => item.status === params.status)
     }
-
-    if (params.sort) {
-      items.sort((a, b) => {
-        let aValue: string | Date | number
-        let bValue: string | Date | number
-
-        switch (params.sort) {
-          case "name":
-            aValue = a.name
-            bValue = b.name
-            break
-          case "date":
-            aValue = new Date(a.createdAt)
-            bValue = new Date(b.createdAt)
-            break
-          case "category":
-            aValue = a.category
-            bValue = b.category
-            break
-          default:
-            return 0
-        }
-
-        if (aValue < bValue) return params.order === "desc" ? 1 : -1
-        if (aValue > bValue) return params.order === "desc" ? -1 : 1
-        return 0
-      })
-    }
-
+    
     return {
       data: items,
-      total: Math.min(listData.count, 1000),
-      page,
-      totalPages: Math.ceil(Math.min(listData.count, 1000) / ITEMS_PER_PAGE),
+      total: params.favorites || params.status ? items.length : data.pagination.total,
+      page: data.pagination.page,
+      totalPages: params.favorites || params.status ? 
+        Math.ceil(items.length / ITEMS_PER_PAGE) : 
+        data.pagination.totalPages,
     }
+    
   } catch (error) {
+    console.error('❌ fetchItems error:', error)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Request was aborted')
+      throw error
+    }
     if (error instanceof NetworkError) {
       throw error
     }
@@ -183,19 +184,22 @@ export async function fetchItems(params: SearchParams = {}): Promise<PaginatedRe
   }
 }
 
+
+
 export async function fetchItemById(id: string): Promise<Item | null> {
   try {
-    const response = await fetch(`${POKEMON_API_BASE}/pokemon/${id}`)
+    const response = await fetch(`${API_BASE}/pokemon/${id}`)
 
     if (!response.ok) {
       if (response.status === 404) {
         throw new DataFetchError(`Pokemon with ID "${id}" not found`, "NOT_FOUND")
       }
-      throw new NetworkError("Failed to connect to Pokemon API")
+      throw new NetworkError("Failed to fetch Pokemon data")
     }
 
-    const pokemonData: PokemonApiResponse = await response.json()
-    return await pokemonToItem(pokemonData)
+    const pokemonData = await response.json()
+    return pokemonToItem(pokemonData)
+    
   } catch (error) {
     if (error instanceof NetworkError || error instanceof DataFetchError) {
       throw error
@@ -206,7 +210,7 @@ export async function fetchItemById(id: string): Promise<Item | null> {
 
 export const categories = [
   "Fire",
-  "Water",
+  "Water", 
   "Grass",
   "Electric",
   "Psychic",
