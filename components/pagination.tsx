@@ -62,7 +62,6 @@ export function Pagination({ currentPage, totalPages, total }: PaginationProps) 
 
   const visiblePages = getVisiblePages()
   
-  // Calculate items per page and start/end items
   const ITEMS_PER_PAGE = 20
   const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, total)

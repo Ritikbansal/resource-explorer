@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { categories, statuses } from "@/lib/data"
 
-// Custom debounce hook with AbortController
 function useDebounceWithAbort<T extends (...args: any[]) => any>(
   callback: T,
   delay: number
@@ -18,21 +17,17 @@ function useDebounceWithAbort<T extends (...args: any[]) => any>(
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const debouncedCallback = useCallback(((...args: Parameters<T>) => {
-    // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
     }
 
-    // Abort previous operation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
 
-    // Create new AbortController
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    // Set new timeout
     timeoutRef.current = setTimeout(() => {
       if (!controller.signal.aborted) {
         callback(...args)
@@ -49,7 +44,6 @@ function useDebounceWithAbort<T extends (...args: any[]) => any>(
     }
   }, [])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cancel()
@@ -72,7 +66,6 @@ export function SearchAndFilters() {
   const currentOrder = searchParams.get("order") || "asc"
   const showFavorites = searchParams.get("favorites") === "true"
 
-  // Debounced search handler with AbortController
   const handleDebouncedSearch = useCallback((query: string) => {
     const currentQuery = searchParams.get("q") || ""
     if (query !== currentQuery) {
@@ -95,7 +88,6 @@ export function SearchAndFilters() {
   )
 
   useEffect(() => {
-    // Skip the effect on initial mount
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
@@ -105,7 +97,6 @@ export function SearchAndFilters() {
   }, [searchQuery, debouncedSearchHandler])
 
   const updateFilter = (key: string, value: string) => {
-    // Cancel any pending search operations
     cancelSearch()
     
     const params = new URLSearchParams(searchParams)

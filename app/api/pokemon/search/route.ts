@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // Search in Pokemon
     const pokemonResults = await prisma.pokemon.findMany({
       where: {
         OR: [
@@ -81,7 +80,6 @@ export async function GET(request: NextRequest) {
       take: 50
     })
     
-    // Search in Species if additional filters are provided - with proper typing
     let speciesResults: Awaited<ReturnType<typeof prisma.pokemonSpecies.findMany>> = []
     
     if (isLegendary || color) {

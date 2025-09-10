@@ -14,6 +14,10 @@ export class DataFetchError extends Error {
     this.name = "DataFetchError"
   }
 }
+const API_BASE =
+  typeof window === "undefined"
+    ? process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000/api"
+    : "/api";
 
 export class NetworkError extends Error {
   constructor(message = "Network connection failed") {
@@ -22,10 +26,8 @@ export class NetworkError extends Error {
   }
 }
 
-const API_BASE = "/api"
 const ITEMS_PER_PAGE = 20
 
-// Convert Pokemon from your database to Item format
 function pokemonToItem(pokemon: any): Item {
   const primaryType = pokemon.types[0]?.type.name || "normal"
   const typeCategories: Record<string, string> = {
@@ -51,12 +53,11 @@ function pokemonToItem(pokemon: any): Item {
 
   let status: "active" | "inactive" | "pending" = "active"
   if (pokemon.totalStats > 600) {
-    status = "pending" // Legendary-tier
+    status = "pending"
   } else if (pokemon.totalStats < 300) {
-    status = "inactive" // Weak Pokemon
+    status = "inactive"
   }
 
-  // Get description from species or default
   let description = `A ${pokemon.types.map((t: any) => t.type.name).join("/")} type Pokemon.`
   if (pokemon.species?.flavorTextEn) {
     description = pokemon.species.flavorTextEn
@@ -69,7 +70,7 @@ function pokemonToItem(pokemon: any): Item {
     category: typeCategories[primaryType] || "Normal",
     status,
     createdAt: pokemon.createdAt || new Date().toISOString(),
-    imageUrl: pokemon.officialArtworkUrl || pokemon.spriteUrl || "#", // Fixed: Added closing quote
+    imageUrl: pokemon.officialArtworkUrl || pokemon.spriteUrl || "#",
     height: pokemon.height || 0,
     weight: pokemon.weight || 0,
     types: pokemon.types.map((t: any) => t.type.name),
@@ -85,7 +86,6 @@ function pokemonToItem(pokemon: any): Item {
 
 export async function fetchItems(params: SearchParams = {}, signal?: AbortSignal): Promise<PaginatedResponse<Item>> {
   try {
-    // Build query parameters
     const searchParams = new URLSearchParams()
     
     if (params.page) {
@@ -124,13 +124,12 @@ export async function fetchItems(params: SearchParams = {}, signal?: AbortSignal
       searchParams.set('sortOrder', params.order)
     }
 
-    const url = `http://localhost:3000/api/pokemon?${searchParams.toString()}`
+    const url = `${API_BASE}/pokemon?${searchParams.toString()}`
     console.log('🌐 Fetching from URL:', url)
     
-    // Pass AbortSignal to fetch
     const response = await fetch(url, {
       cache: 'no-store',
-      signal // Add AbortSignal here
+      signal
     })
     
     if (!response.ok) {
@@ -145,10 +144,8 @@ export async function fetchItems(params: SearchParams = {}, signal?: AbortSignal
       itemCount: data.data?.length 
     })
     
-    // Convert Pokemon to Items
     let items = data.data.map(pokemonToItem)
     
-    // Apply client-side filters
     if (params.favorites) {
       try {
         const favoriteIds = FavoritesManager.getFavorites()
@@ -201,6 +198,7 @@ export async function fetchItemById(id: string): Promise<Item | null> {
     return pokemonToItem(pokemonData)
     
   } catch (error) {
+    console.log('error', error)
     if (error instanceof NetworkError || error instanceof DataFetchError) {
       throw error
     }

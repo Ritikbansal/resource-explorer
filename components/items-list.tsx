@@ -30,12 +30,10 @@ export function ItemsList({ searchParams }: ItemsListProps) {
 
   const loadData = useCallback(async () => {
     try {
-      // Abort previous request if still pending
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
 
-      // Create new AbortController for this request
       abortControllerRef.current = new AbortController()
       const signal = abortControllerRef.current.signal
 
@@ -45,7 +43,6 @@ export function ItemsList({ searchParams }: ItemsListProps) {
       console.log('🔄 Starting data fetch with params:', params)
       const result = await fetchItems(params, signal)
       
-      // Only update state if request wasn't aborted
       if (!signal.aborted) {
         console.log('✅ Data loaded successfully:', result)
         setData(result)
@@ -53,7 +50,6 @@ export function ItemsList({ searchParams }: ItemsListProps) {
         console.log('🚫 Request was aborted, ignoring result')
       }
     } catch (err) {
-      // Only update error if request wasn't aborted
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         if (err instanceof Error && err.name === 'AbortError') {
           console.log('Request was cancelled')
@@ -63,7 +59,6 @@ export function ItemsList({ searchParams }: ItemsListProps) {
         setError(err instanceof Error ? err : new Error("Failed to load items"))
       }
     } finally {
-      // Only update loading if request wasn't aborted
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         setLoading(false)
       }
@@ -81,7 +76,6 @@ export function ItemsList({ searchParams }: ItemsListProps) {
   useEffect(() => {
     loadData()
 
-    // Cleanup function to abort request when component unmounts or params change
     return () => {
       if (abortControllerRef.current) {
         console.log('🧹 Cleaning up: aborting pending request')

@@ -44,7 +44,6 @@ export async function GET(
       )
     }
     
-    // Get species data separately (since there's no direct relation)
     const species = await prisma.pokemonSpecies.findUnique({
       where: { id: pokemon.id }
     })
